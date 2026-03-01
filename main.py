@@ -6,17 +6,17 @@ from typing import List
 import json
 
 import anthropic
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 app = FastAPI()
 
-# ✅ CORS Middleware (the correct way)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -71,13 +71,35 @@ Reply with ONLY a JSON object in this exact format, nothing else:
     data = json.loads(raw)
     return data["error_lines"]
 
+# --- Handle OPTIONS preflight ---
+@app.options("/code-interpreter")
+async def options_handler():
+    return JSONResponse(
+        content={},
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization",
+        }
+    )
+
 # --- Endpoint ---
-@app.post("/code-interpreter", response_model=CodeResponse)
+@app.post("/code-interpreter")
 def code_interpreter(request: CodeRequest):
     execution = execute_python_code(request.code)
 
     if execution["success"]:
-        return CodeResponse(error=[], result=execution["output"])
+        response_data = {"error": [], "result": execution["output"]}
+    else:
+        error_lines = analyze_error_with_ai(request.code, execution["output"])
+        response_data = {"error": error_lines, "result": execution["output"]}
 
-    error_lines = analyze_error_with_ai(request.code, execution["output"])
-    return CodeResponse(error=error_lines, result=execution["output"])
+    return JSONResponse(
+        content=response_data,
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization",
+            "Access-Control-Expose-Headers": "Access-Control-Allow-Origin",
+        }
+    )
