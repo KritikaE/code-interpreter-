@@ -12,13 +12,14 @@ from pydantic import BaseModel
 
 app = FastAPI()
 
-# ✅ CORS
-CORS_HEADERS = {
-“Access-Control-Allow-Origin”: “*”,
-“Access-Control-Allow-Methods”: “POST, GET, OPTIONS”,
-“Access-Control-Allow-Headers”: “Content-Type, Authorization”,
-“Access-Control-Expose-Headers”: “Access-Control-Allow-Origin”,
-}
+# ✅ CORS Middleware (the correct way)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # --- Models ---
 class CodeRequest(BaseModel):
@@ -61,12 +62,11 @@ Reply with ONLY a JSON object in this exact format, nothing else:
 """
 
     message = client.messages.create(
-        model="claude-haiku-4-5-20251001",  # cheapest/fastest Claude model
+        model="claude-haiku-4-5",
         max_tokens=256,
         messages=[{"role": "user", "content": prompt}]
     )
 
-    # Parse the JSON response
     raw = message.content[0].text.strip()
     data = json.loads(raw)
     return data["error_lines"]
