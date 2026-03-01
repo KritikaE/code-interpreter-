@@ -6,28 +6,23 @@ from typing import List
 import json
 
 import anthropic
-from fastapi import FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 app = FastAPI()
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Enable CORS
+CORS_HEADERS = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Access-Control-Expose-Headers": "Access-Control-Allow-Origin",
+}
 
 # --- Models ---
 class CodeRequest(BaseModel):
     code: str
-
-class CodeResponse(BaseModel):
-    error: List[int]
-    result: str
 
 # --- Part 1: Execute Code ---
 def execute_python_code(code: str) -> dict:
@@ -71,17 +66,10 @@ Reply with ONLY a JSON object in this exact format, nothing else:
     data = json.loads(raw)
     return data["error_lines"]
 
-# --- Handle OPTIONS preflight ---
+# --- OPTIONS preflight ---
 @app.options("/code-interpreter")
 async def options_handler():
-    return JSONResponse(
-        content={},
-        headers={
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
-            "Access-Control-Allow-Headers": "Content-Type, Authorization",
-        }
-    )
+    return JSONResponse(content={}, headers=CORS_HEADERS)
 
 # --- Endpoint ---
 @app.post("/code-interpreter")
@@ -94,12 +82,4 @@ def code_interpreter(request: CodeRequest):
         error_lines = analyze_error_with_ai(request.code, execution["output"])
         response_data = {"error": error_lines, "result": execution["output"]}
 
-    return JSONResponse(
-        content=response_data,
-        headers={
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
-            "Access-Control-Allow-Headers": "Content-Type, Authorization",
-            "Access-Control-Expose-Headers": "Access-Control-Allow-Origin",
-        }
-    )
+    return JSONResponse(content=response_data, headers=CORS_HEADERS)
